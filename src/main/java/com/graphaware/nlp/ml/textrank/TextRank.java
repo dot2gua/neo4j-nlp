@@ -229,29 +229,28 @@ public class TextRank {
         if (useTfIdfWeights)
             pageRank.setNodeWeights( initializeNodeWeights_TfIdf(annotatedText, coOccurrence) );
         Map<Long, Double> pageRanks = pageRank.run(coOccurrence, iter, damp, threshold);
+
         int n_oneThird = (int) (pageRanks.size()/3.0f);
         n_oneThird = n_oneThird > 30 ? 30 : n_oneThird;
-        List<Long> topx = getTopX(pageRanks, n_oneThird);
+        List<Long> topThird = getTopX(pageRanks, n_oneThird);
+        List<Long> top_singles = getTopX(pageRanks, n_oneThird > 10 ? 10 : n_oneThird);
 
         //pageRanks.entrySet().stream().sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
         //    .forEach(en -> LOG.info(idToValue.get(en.getKey()) + ": " + en.getValue()));
         //LOG.info("Sum of PageRanks = " + pageRanks.values().stream().mapToDouble(Number::doubleValue).sum());
-        String topStr = "";
-        for (Long id: topx) {
-            topStr += idToValue.get(id) + ", ";
-        }
-        LOG.info("Top " + n_oneThird + " tags: " + topStr);
+        LOG.info("Top " + n_oneThird + " tags: " + topThird.stream().map(id -> idToValue.get(id)).collect(Collectors.joining(", ")));
 
         Map<String, Object> params = new HashMap<>();
         params.put("id", annotatedText.getId());
-        params.put("nodeList", topx);
+        params.put("nodeList", topThird);
         params.put("posList", admittedPOSs);
         Result res = database.execute(
                 "MATCH (node:Tag)<-[:TAG_OCCURRENCE_TAG]-(to:TagOccurrence)<-[:SENTENCE_TAG_OCCURRENCE]-(:Sentence)<-[:CONTAINS_SENTENCE]-(a:AnnotatedText)\n"
                 + "WHERE id(a) = {id} and id(node) in {nodeList}\n"
                 + "OPTIONAL MATCH (to)-[:COMPOUND|AMOD]-(to2:TagOccurrence)-[:TAG_OCCURRENCE_TAG]->(t2:Tag)\n"
                 + "WHERE not exists(t2.pos) or (t2.pos in {posList})\n"
-                + "RETURN node.id as tag, to.startPosition as sP, to.endPosition as eP, id(node) as tagId, collect(t2.value) as rel_tags, collect(to2.startPosition) as rel_tos,  collect(to2.endPosition) as rel_toe\n"
+                + "RETURN node.id as tag, to.startPosition as sP, to.endPosition as eP, id(node) as tagId, "
+                    + "collect(t2.value) as rel_tags, collect(to2.startPosition) as rel_tos,  collect(to2.endPosition) as rel_toe\n"
                 + "ORDER BY sP asc",
                 params);
 
@@ -265,11 +264,10 @@ public class TextRank {
         Map<String, List<WordItem>> dependencies = new HashMap<>();
         while (res != null && res.hasNext()) {
             Map<String, Object> next = res.next();
-            Long tagId = (Long) next.get("tagId");
-            //if (!topx.contains(tagId))
-            //    continue;
+            long tagId = (long) next.get("tagId");
             int startPosition = (int) next.get("sP");
             int endPosition = (int) next.get("eP");
+
 
             List<String> rel_tags = iterableToList( (Iterable<String>) next.get("rel_tags") );
             List<Integer> rel_tos = iterableToList( (Iterable<Integer>) next.get("rel_tos") );
@@ -279,21 +277,19 @@ public class TextRank {
                 rel_dep.add(new WordItem(rel_tos.get(i), rel_toe.get(i), rel_tags.get(i)));
             }
 
-            Double score = pageRanks.get(tagId);
             String tag = (String) next.get("tag");
-            
             final String[] tagSplit = tag.split("_");
             if (tagSplit.length > 2) {
                 LOG.warn("Tag " + tag + " has more than 1 underscore symbols");
             }
-            
             String tagVal = tagSplit[0];
             lang = tagSplit[1];
 
             if (removeStopWords && stopWords.stream().anyMatch(str -> str.equals(tagVal))) {
                 continue;
             }
-            keywords.put(tag, score);
+
+            keywords.put(tag, pageRanks.get(tagId));
             
             if (startPosition - prev_eP <= 1 && dependencies.containsKey(prev_tag)) {
                 List<WordItem> merged = new ArrayList<>(dependencies.get(prev_tag));
@@ -355,33 +351,32 @@ public class TextRank {
     }
 
     private void addKeyphraseToResults(Map<Integer, String> keyphrase, Map<String, List<WordItem>> dependencies, long prev_eP, String lang, Map<String, Integer> results) {
-        if (keyphrase.size() > 1) {
-            // append dependency word if it's missing
-            List<WordItem> missing_words = new ArrayList<>();
-            for (String key: dependencies.keySet()) {
-                missing_words.addAll(dependencies.get(key));
-            }
-            missing_words.removeAll(keyphrase.values());
-            missing_words.stream()
-                //.filter(wi -> keyphrase.entrySet().stream().filter(en -> (en.getKey() - wi.getEnd()) <= 1 || (wi.getStart() - prev_eP) <= 1).count() > 0 ) // don't use `<=` only - the left hand side can be negative!
-                .filter(wi -> keyphrase.entrySet().stream().filter(en -> (en.getKey() - wi.getEnd()) == 1 || (wi.getStart() - prev_eP) == 1).count() > 0 )
-                .forEach(wi -> keyphrase.put(wi.getStart(), wi.getWord()));
-
-            // store keyphrase into 'results'
-            String key = keyphrase.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(en -> en.getValue())
-                .collect(Collectors.joining(" "));
-            key += "_" + lang;
-
-            //String key = String.join(, " ") + "_" + lang;
-            if (results.containsKey(key)) {
-                results.put(key, results.get(key) + 1);
-            } else {
-                results.put(key, 1);
-            }
+        if (keyphrase == null || keyphrase.size() < 2)
+            return;
+        // append dependency word if it's missing
+        List<WordItem> missing_words = new ArrayList<>();
+        for (String key: dependencies.keySet()) {
+            missing_words.addAll(dependencies.get(key));
         }
+        missing_words.removeAll(keyphrase.values());
+        missing_words.stream()
+            //.filter(wi -> keyphrase.entrySet().stream().filter(en -> (en.getKey() - wi.getEnd()) <= 1 || (wi.getStart() - prev_eP) <= 1).count() > 0 ) // don't use `<=` only - the left hand side can be negative!
+            .filter(wi -> keyphrase.entrySet().stream().filter(en -> (en.getKey() - wi.getEnd()) == 1 || (wi.getStart() - prev_eP) == 1).count() > 0 )
+            .forEach(wi -> keyphrase.put(wi.getStart(), wi.getWord()));
 
+        // store keyphrase into 'results'
+        String key = keyphrase.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(en -> en.getValue())
+            .collect(Collectors.joining(" "));
+        key += "_" + lang;
+
+        //String key = String.join(, " ") + "_" + lang;
+        if (results.containsKey(key)) {
+            results.put(key, results.get(key) + 1);
+        } else {
+            results.put(key, 1);
+        }
     }
 
     private List<Long> getTopX(Map<Long, Double> pageRanks, int x) {
