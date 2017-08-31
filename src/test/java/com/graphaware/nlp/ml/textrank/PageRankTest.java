@@ -49,13 +49,14 @@ public class PageRankTest extends EmbeddedDatabaseIntegrationTest {
         // run PageRank
         try (Transaction tx = getDatabase().beginTx()) {
             getDatabase().execute(
-                "match (a:AnnotatedText) where a.id=\"test118\"\n"
-                + "call ga.nlp.ml.textrank.computePageRank({annotatedText: a, relationshipType: \"Related_to\", "
+                //"match (a:AnnotatedText) where a.id=\"test118\"\n"
+                "call ga.nlp.ml.textrank.computePageRank({relationshipType: \"Related_to\", "
                     + "nodeType: \"Test\", damp: " + damp + "}) yield result\n"
-                + "return result\n"
+                + "return result"
             );
+            tx.success();
         } catch (Exception e) {
-            assertTrue("PageRank failed: " + e.getMessage(), true);
+            assertTrue("PageRank failed: " + e.getMessage(), false);
             return;
         }
 
@@ -63,6 +64,7 @@ public class PageRankTest extends EmbeddedDatabaseIntegrationTest {
         //double minPR = (1 - damp) / expectedPRs.size();
         try (Transaction tx = getDatabase().beginTx()) {
             Result result = getDatabase().execute("match (t:Test) return t.value as tag, t.pagerank as pr");
+            assertNotNull("No PageRank results found!", result);
             while (result!=null && result.hasNext()) {
                 Map<String, Object> next = result.next();
                 String tag = (String) next.get("tag");
@@ -70,15 +72,16 @@ public class PageRankTest extends EmbeddedDatabaseIntegrationTest {
                 assertTrue("PageRank " + pr + "% of node " + tag + " doesn't match expected value " + expectedPRs.get(tag) + "%",
                     Math.abs(expectedPRs.get(tag) - pr) < 0.1 * expectedPRs.get(tag));
             }
+            tx.success();
         } catch (Exception e) {
-            assertTrue("PageRank evaluation failed: " + e.getMessage(), true);
+            assertTrue("PageRank evaluation failed: " + e.getMessage(), false);
         }
     }
 
     private void createGraph() {
         try (Transaction tx = getDatabase().beginTx()) {
             getDatabase().execute(
-                "create (at:AnnotatedText {id: \"test118\"})-[:TestRel]->(d:Test {value: \"D\"})\n"
+                /*"create (at:AnnotatedText {id: \"test118\"})-[:TestRel]->(d:Test {value: \"D\"})\n"
                 + "merge (d)-[:Related_to]->(a:Test {value: \"A\"})<-[:TestRel]-(at)\n"
                 + "merge (d)-[:Related_to]->(b:Test {value: \"B\"})<-[:TestRel]-(at)\n"
                 + "merge (at)-[:TestRel]->(e:Test {value: \"E\"})-[:Related_to]->(b)\n"
@@ -95,11 +98,28 @@ public class PageRankTest extends EmbeddedDatabaseIntegrationTest {
                 + "merge (h)-[:Related_to]->(e)\n"
                 + "merge (i)-[:Related_to]->(e)\n"
                 + "merge (at)-[:TestRel]->(j:Test {value: \"J\"})-[:Related_to]->(e)\n"
-                + "merge (at)-[:TestRel]->(k:Test {value: \"K\"})-[:Related_to]->(e)\n"
+                + "merge (at)-[:TestRel]->(k:Test {value: \"K\"})-[:Related_to]->(e)\n"*/
+                "merge (d:Test {value: \"D\"})-[:Related_to]->(a:Test {value: \"A\"})<-[:TestRel]-(at)\n"
+                + "merge (d)-[:Related_to]->(b:Test {value: \"B\"})<-[:TestRel]-(at)\n"
+                + "merge (e:Test {value: \"E\"})-[:Related_to]->(b)\n"
+                + "merge (e)-[:Related_to]->(d)\n"
+                + "merge (e)-[:Related_to]->(f:Test {value: \"F\"})\n"
+                + "merge (f)-[:Related_to]->(e)\n"
+                + "merge (f)-[:Related_to]->(b)\n"
+                + "merge (b)-[:Related_to]->(c:Test {value: \"C\"})\n"
+                + "merge (c)-[:Related_to]->(b)\n"
+                + "merge (g:Test {value: \"G\"})-[:Related_to]->(b)\n"
+                + "merge (h:Test {value: \"H\"})-[:Related_to]->(b)\n"
+                + "merge (i:Test {value: \"I\"})-[:Related_to]->(b)\n"
+                + "merge (g)-[:Related_to]->(e)\n"
+                + "merge (h)-[:Related_to]->(e)\n"
+                + "merge (i)-[:Related_to]->(e)\n"
+                + "merge (j:Test {value: \"J\"})-[:Related_to]->(e)\n"
+                + "merge (k:Test {value: \"K\"})-[:Related_to]->(e)\n"
             );
             tx.success();
         } catch (Exception e) {
-            assertTrue("PageRankTest: error while initialising graph", true);
+            assertTrue("PageRankTest: error while initialising graph", false);
         }
     }
 

@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -53,7 +54,7 @@ public class TextRank {
         this.database = database;
         this.stopWords = Arrays.asList("new", "old", "large", "big", "small", "many", "few", "best", "worst");
         this.removeStopWords = false;
-        this.directionMatters = true;
+        this.directionMatters = false;
         this.respectSentences = false;
         this.useTfIdfWeights = false;
         this.cooccurrenceWindow = 2;
@@ -224,15 +225,17 @@ public class TextRank {
 
     public boolean evaluate(Node annotatedText, Map<Long, Map<Long, CoOccurrenceItem>> coOccurrence, int iter, double damp, double threshold) {
         PageRank pageRank = new PageRank(database);
+        pageRank.respectDirections(directionMatters);
         if (useTfIdfWeights)
             pageRank.setNodeWeights( initializeNodeWeights_TfIdf(annotatedText, coOccurrence) );
         Map<Long, Double> pageRanks = pageRank.run(coOccurrence, iter, damp, threshold);
         int n_oneThird = (int) (pageRanks.size()/3.0f);
+        n_oneThird = n_oneThird > 30 ? 30 : n_oneThird;
         List<Long> topx = getTopX(pageRanks, n_oneThird);
 
-        pageRanks.entrySet().stream().sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-            .forEach(en -> LOG.info(idToValue.get(en.getKey()) + ": " + en.getValue()));
-        LOG.info("Sum of PageRanks = " + pageRanks.values().stream().mapToDouble(Number::doubleValue).sum());
+        //pageRanks.entrySet().stream().sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+        //    .forEach(en -> LOG.info(idToValue.get(en.getKey()) + ": " + en.getValue()));
+        //LOG.info("Sum of PageRanks = " + pageRanks.values().stream().mapToDouble(Number::doubleValue).sum());
         String topStr = "";
         for (Long id: topx) {
             topStr += idToValue.get(id) + ", ";
@@ -242,27 +245,42 @@ public class TextRank {
         Map<String, Object> params = new HashMap<>();
         params.put("id", annotatedText.getId());
         params.put("nodeList", topx);
+        params.put("posList", admittedPOSs);
         Result res = database.execute(
                 "MATCH (node:Tag)<-[:TAG_OCCURRENCE_TAG]-(to:TagOccurrence)<-[:SENTENCE_TAG_OCCURRENCE]-(:Sentence)<-[:CONTAINS_SENTENCE]-(a:AnnotatedText)\n"
                 + "WHERE id(a) = {id} and id(node) in {nodeList}\n"
-                + "RETURN node.id as tag, to.startPosition as sP, to.endPosition as eP, id(node) as tagId\n"
+                + "OPTIONAL MATCH (to)-[:COMPOUND|AMOD]-(to2:TagOccurrence)-[:TAG_OCCURRENCE_TAG]->(t2:Tag)\n"
+                + "WHERE not exists(t2.pos) or (t2.pos in {posList})\n"
+                + "RETURN node.id as tag, to.startPosition as sP, to.endPosition as eP, id(node) as tagId, collect(t2.value) as rel_tags, collect(to2.startPosition) as rel_tos,  collect(to2.endPosition) as rel_toe\n"
                 + "ORDER BY sP asc",
                 params);
 
         // First: merge neighboring words into phrases
         long prev_eP = -1000;
-        String keyword = "";
+        String prev_tag = "";
+        String lang = "";
+        Map<Integer, String> keyphrase = new HashMap<>();
         Map<String, Integer> results = new HashMap<>();
         Map<String, Double> keywords = new HashMap<>();
+        Map<String, List<WordItem>> dependencies = new HashMap<>();
         while (res != null && res.hasNext()) {
             Map<String, Object> next = res.next();
+            Long tagId = (Long) next.get("tagId");
+            //if (!topx.contains(tagId))
+            //    continue;
             int startPosition = (int) next.get("sP");
             int endPosition = (int) next.get("eP");
-            Long tagId = (Long) next.get("tagId");
-            
+
+            List<String> rel_tags = iterableToList( (Iterable<String>) next.get("rel_tags") );
+            List<Integer> rel_tos = iterableToList( (Iterable<Integer>) next.get("rel_tos") );
+            List<Integer> rel_toe = iterableToList( (Iterable<Integer>) next.get("rel_toe") );
+            List<WordItem> rel_dep = new ArrayList<>();
+            for (int i=0; i<rel_tags.size(); i++)  {
+                rel_dep.add(new WordItem(rel_tos.get(i), rel_toe.get(i), rel_tags.get(i)));
+            }
+
             Double score = pageRanks.get(tagId);
             String tag = (String) next.get("tag");
-            
             
             final String[] tagSplit = tag.split("_");
             if (tagSplit.length > 2) {
@@ -270,28 +288,34 @@ public class TextRank {
             }
             
             String tagVal = tagSplit[0];
-            String lang = tagSplit[1];
+            lang = tagSplit[1];
 
             if (removeStopWords && stopWords.stream().anyMatch(str -> str.equals(tagVal))) {
                 continue;
             }
             keywords.put(tag, score);
             
-            if (startPosition - prev_eP <= 1) {
-                keyword += " " + tagVal;
-            } else {
-                if (keyword.split(" ").length > 1) {
-                    if (results.containsKey(keyword + "_" + lang)) {
-                        results.put(keyword + "_" + lang, results.get(keyword + "_" + lang) + 1);
-                    } else {
-                        results.put(keyword + "_" + lang, 1);
-                    }
+            if (startPosition - prev_eP <= 1 && dependencies.containsKey(prev_tag)) {
+                List<WordItem> merged = new ArrayList<>(dependencies.get(prev_tag));
+                merged.retainAll(rel_dep); // 'merged' now contains only elements that are shared between the two lists
+                if (merged.size() > 0 || dependencies.get(prev_tag).stream().filter(wi -> wi.getWord().equals(tagVal)).count() > 0) {
+                    keyphrase.put(startPosition, tagVal);
+                    dependencies.put(tagVal, rel_dep);
                 }
-                keyword = tagVal;
+            } else {
+                addKeyphraseToResults(keyphrase, dependencies, prev_eP, lang, results);
+
+                keyphrase.clear();
+                keyphrase.put(startPosition, tagVal);
+                dependencies.clear();
+                dependencies.put(tagVal, rel_dep);
             }
             prev_eP = endPosition;
+            prev_tag = tagVal;
             
         }
+
+        addKeyphraseToResults(keyphrase, dependencies, prev_eP, lang, results);
 
         // Next: include into final result simply top-x single words
         keywords.entrySet().stream().sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
@@ -328,6 +352,36 @@ public class TextRank {
         });
 
         return true;
+    }
+
+    private void addKeyphraseToResults(Map<Integer, String> keyphrase, Map<String, List<WordItem>> dependencies, long prev_eP, String lang, Map<String, Integer> results) {
+        if (keyphrase.size() > 1) {
+            // append dependency word if it's missing
+            List<WordItem> missing_words = new ArrayList<>();
+            for (String key: dependencies.keySet()) {
+                missing_words.addAll(dependencies.get(key));
+            }
+            missing_words.removeAll(keyphrase.values());
+            missing_words.stream()
+                //.filter(wi -> keyphrase.entrySet().stream().filter(en -> (en.getKey() - wi.getEnd()) <= 1 || (wi.getStart() - prev_eP) <= 1).count() > 0 ) // don't use `<=` only - the left hand side can be negative!
+                .filter(wi -> keyphrase.entrySet().stream().filter(en -> (en.getKey() - wi.getEnd()) == 1 || (wi.getStart() - prev_eP) == 1).count() > 0 )
+                .forEach(wi -> keyphrase.put(wi.getStart(), wi.getWord()));
+
+            // store keyphrase into 'results'
+            String key = keyphrase.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(en -> en.getValue())
+                .collect(Collectors.joining(" "));
+            key += "_" + lang;
+
+            //String key = String.join(, " ") + "_" + lang;
+            if (results.containsKey(key)) {
+                results.put(key, results.get(key) + 1);
+            } else {
+                results.put(key, 1);
+            }
+        }
+
     }
 
     private List<Long> getTopX(Map<Long, Double> pageRanks, int x) {
@@ -380,4 +434,38 @@ public class TextRank {
 
         return nodeWeights;
     }
+
+    public boolean postprocess(String keywordsLabel) {
+        //Map<String, Object> params = new HashMap<>();
+        //params.put("Keyword", keywordsLabel);
+
+        String query = "match (k:" + keywordsLabel + ")\n"
+            + "where size(split(k.value, \" \")) > 1\n"
+            + "with k, split(k.value, \" \") as ks_orig\n"
+            + "match (k2:" + keywordsLabel + ")\n"
+            + "where size(split(k2.value, \" \")) > size(ks_orig)\n"
+            + "with ks_orig, k2, k, split(k2.value, \" \") as ks_check\n"
+            + "where all(el in ks_orig where el in ks_check)\n"
+            + "match (k2)-[:DESCRIBES]->(a:AnnotatedText)\n"
+            + "merge (k)-[r:DESCRIBES]->(a)";
+
+        try (Transaction tx = database.beginTx();) { 
+            database.execute(query);
+            tx.success();
+        } catch (Exception e) {
+            LOG.error("Error while running TextRank post-processing: ", e);
+            return false;
+        }
+
+        return true;
+    }
+
+    private <T> List<T> iterableToList(Iterable<T> it) {
+        List<T> newList = new ArrayList<>();
+        for (T obj: it) {
+            newList.add(obj);
+        }
+        return newList;
+    }
+
 }

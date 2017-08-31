@@ -90,6 +90,7 @@ public class NLPProcedures {
         TextRankProcedure textrankProcedures = new TextRankProcedure(database);
         procedures.register(textrankProcedures.computePageRank());
         procedures.register(textrankProcedures.compute());
+        procedures.register(textrankProcedures.postprocess());
         
         LDAProcedure ldaProcedures = new LDAProcedure(database, processorsManager);
         procedures.register(ldaProcedures.lda());

@@ -53,6 +53,7 @@ public class TextRankProcedure extends NLPProcedure {
     private final static String PARAMETER_RESPECT_SENTENCES = "respectSentences";
     private final static String PARAMETER_USE_TFIDF_WEIGHTS = "useTfIdfWeights";
     private final static String PARAMETER_COOCCURRENCE_WINDOW = "cooccurrenceWindow";
+    private final static String PARAMETER_KEYWORDS_LABEL = "keywordsLabel";
 
     private static final long DEFAULT_ITERATIONS = 30;
     private static final double DEFAULT_DUMPING_FACTOR = 0.85;
@@ -61,10 +62,12 @@ public class TextRankProcedure extends NLPProcedure {
     private static final String DEFAULT_CO_OCCURRENCE_RELATIONTHIP = "CO_OCCURRENCE";
     private static final String DEFAULT_WEIGHT_PROPERTY = "weight";
     private static final boolean DEFAULT_STOPWORDS_ENABLING = false;
-    private static final boolean DEFAULT_RESPECT_DIRECTIONS = false;
+    private static final boolean DEFAULT_RESPECT_DIRECTIONS_TEXTRANK = false;
+    private static final boolean DEFAULT_RESPECT_DIRECTIONS_PAGERANK = true;
     private static final boolean DEFAULT_RESPECT_SENTENCES = false;
     private static final boolean DEFAULT_USE_TFIDF_WEIGHTS = false;
     private static final long DEFAULT_COOCCURRENCE_WINDOW = 2;
+    private static final String DEFAULT_KEYWORDS_LABEL = "Keyword";
 
     private final GraphDatabaseService database;
 
@@ -81,19 +84,17 @@ public class TextRankProcedure extends NLPProcedure {
             @Override
             public RawIterator<Object[], ProcedureException> apply(Context ctx, Object[] input) throws ProcedureException {
                 Map<String, Object> inputParams = (Map) input[0];
-                if (!inputParams.containsKey(PARAMETER_ANNOTATED_TEXT)) {
-                    LOG.error("Missing parameter \'" + PARAMETER_ANNOTATED_TEXT + "\'");
-                    return Iterators.asRawIterator(Collections.<Object[]>singleton(new String[]{"failure"}).iterator());
-                }
                 String nodeType = (String) inputParams.getOrDefault(PARAMETER_NODE_TYPE, DEFAULT_NODE_TYPE);
                 String relType = (String) inputParams.getOrDefault(PARAMETER_RELATIONSHIP_TYPE, DEFAULT_CO_OCCURRENCE_RELATIONTHIP);
                 String relWeight = (String) inputParams.getOrDefault(PARAMETER_RELATIONSHIP_WEIGHT, DEFAULT_WEIGHT_PROPERTY);
                 int iter = ((Long) inputParams.getOrDefault(PARAMETER_ITERATIONS, DEFAULT_ITERATIONS)).intValue();
                 double damp = (double) inputParams.getOrDefault(PARAMETER_DAMPING_FACTOR, DEFAULT_DUMPING_FACTOR);
                 double threshold = (double) inputParams.getOrDefault(PARAMETER_DAMPING_THRESHOLD, DEFAULT_THRESHOLD);
+                boolean respectDirections = (boolean) inputParams.getOrDefault(PARAMETER_RESPECT_DIRECTIONS, DEFAULT_RESPECT_DIRECTIONS_PAGERANK);
 
                 String result = "success";
                 PageRank pagerank = new PageRank(database);
+                pagerank.respectDirections(respectDirections);
                 Map<Long, Map<Long, CoOccurrenceItem>> coOccurrences = pagerank.processGraph(nodeType, relType, relWeight);
                 if (coOccurrences.isEmpty()) {
                     result = "failure";
@@ -131,7 +132,7 @@ public class TextRankProcedure extends NLPProcedure {
                 double damp = (double) inputParams.getOrDefault(PARAMETER_DAMPING_FACTOR, DEFAULT_DUMPING_FACTOR);
                 double threshold = (double) inputParams.getOrDefault(PARAMETER_DAMPING_THRESHOLD, DEFAULT_THRESHOLD);
                 boolean doStopwords = (boolean) inputParams.getOrDefault(PARAMETER_DO_STOPWORDS, DEFAULT_STOPWORDS_ENABLING);
-                boolean respectDirections = (boolean) inputParams.getOrDefault(PARAMETER_RESPECT_DIRECTIONS, DEFAULT_RESPECT_DIRECTIONS);
+                boolean respectDirections = (boolean) inputParams.getOrDefault(PARAMETER_RESPECT_DIRECTIONS, DEFAULT_RESPECT_DIRECTIONS_TEXTRANK);
                 boolean respectSentences = (boolean) inputParams.getOrDefault(PARAMETER_RESPECT_SENTENCES, DEFAULT_RESPECT_SENTENCES);
                 boolean useTfIdfWeights = (boolean) inputParams.getOrDefault(PARAMETER_USE_TFIDF_WEIGHTS, DEFAULT_USE_TFIDF_WEIGHTS);
                 int cooccurrenceWindow = ((Long) inputParams.getOrDefault(PARAMETER_COOCCURRENCE_WINDOW, DEFAULT_COOCCURRENCE_WINDOW)).intValue();
@@ -157,6 +158,30 @@ public class TextRankProcedure extends NLPProcedure {
                 }
 
                 LOG.info("AnnotatedText with ID " + annotatedText.getId() + " processed.");
+
+                return Iterators.asRawIterator(Collections.<Object[]>singleton(new Object[]{resReport}).iterator());
+            }
+        };
+    }
+
+    public CallableProcedure.BasicProcedure postprocess() {
+        return new CallableProcedure.BasicProcedure(procedureSignature(getProcedureName("ml", "textrank", "postprocess"))
+                .mode(Mode.WRITE)
+                .in(PARAMETER_NAME_INPUT, Neo4jTypes.NTAny)
+                .out("result", Neo4jTypes.NTString).build()) {
+
+            @Override
+            public RawIterator<Object[], ProcedureException> apply(Context ctx, Object[] input) throws ProcedureException {
+                Map<String, Object> inputParams = (Map) input[0];
+                String kwLabel = (String) inputParams.getOrDefault(PARAMETER_KEYWORDS_LABEL, DEFAULT_KEYWORDS_LABEL);
+
+                LOG.info("Starting TextRank post-processing ...");
+
+                String resReport = "success";
+
+                TextRank textrank = new TextRank(database);
+                if (!textrank.postprocess(kwLabel))
+                    resReport = "failure";
 
                 return Iterators.asRawIterator(Collections.<Object[]>singleton(new Object[]{resReport}).iterator());
             }
