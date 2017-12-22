@@ -30,6 +30,7 @@ public class NaiveBayesClassifierTest {
         classifier.learn("l8606", Arrays.asList(l8606));
         classifier.learn("l8607", Arrays.asList(l8607));
         classifier.learn("l8614", Arrays.asList(l8614));
+        classifier.learn("l8606", Arrays.asList("Left Knee ACL reconstruction on 8/3/17  Status: Complete  Done: 01Aug2017".split(" ")));
 
         System.out.println(classifier.classify(Arrays.asList(input.split(" "))).getCategory());
 
