@@ -43,6 +43,8 @@ public class PipelineSpecification {
 
     private List<String> excludedPOS = new ArrayList<>();
 
+    private Map<String, String> customModelPaths = new HashMap<>();
+
     public PipelineSpecification() {
 
     }
@@ -138,6 +140,10 @@ public class PipelineSpecification {
 
     public void setExcludedPOS(List<String> excludedPOS) {
         this.excludedPOS = excludedPOS;
+    }
+
+    public Map<String, String> getCustomModelPaths() {
+        return customModelPaths;
     }
 
     private boolean objectToBoolean(Object obj) {

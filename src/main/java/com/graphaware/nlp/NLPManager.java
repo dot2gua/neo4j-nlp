@@ -42,6 +42,7 @@ import com.graphaware.nlp.persistence.persisters.Persister;
 import com.graphaware.nlp.processor.PipelineInfo;
 import com.graphaware.nlp.processor.TextProcessor;
 import com.graphaware.nlp.processor.TextProcessorsManager;
+import com.graphaware.nlp.util.DirectoryUtils;
 import com.graphaware.nlp.util.ProcessorUtils;
 import com.graphaware.nlp.util.ServiceLoader;
 import com.graphaware.nlp.vector.QueryBasedVectorComputation;
@@ -77,6 +78,8 @@ public final class NLPManager {
     private EventDispatcher eventDispatcher;
 
     private boolean initialized = false;
+
+    private Map<String, String> customModelPaths = new HashMap<>();
 
     private NLPManager() {
         super();
@@ -269,6 +272,7 @@ public final class NLPManager {
         if (null == request.getTextProcessor() || textProcessorsManager.getTextProcessor(request.getTextProcessor()) == null) {
             throw new RuntimeException(String.format("Invalid text processor %s", request.getTextProcessor()));
         }
+        checkCustomModelPathShouldBeAddedToPipelineSpecification(request);
         configuration.storeCustomPipeline(request);
     }
 
@@ -338,11 +342,23 @@ public final class NLPManager {
 
     public String train(CustomModelsRequest request) {
         TextProcessor processor = textProcessorsManager.getTextProcessor(request.getTextProcessor());
-        return processor.train(request.getAlg(), request.getModelID(), request.getInputFile(), request.getLanguage(), request.getTrainingParameters());
+        String result = processor.train(request.getAlg(), request.getModelID(), request.getInputFile(), request.getLanguage(), request.getTrainingParameters());
+
+        customModelPaths.put(request.getModelID(), DirectoryUtils.getFileOutputNameBasedOnSourceFilePathAndOutputName(request.getInputFile(), "sentiment-" + request.getModelID() + ".bin"));
+        return result;
     }
 
     public String test(CustomModelsRequest request) {
         TextProcessor processor = textProcessorsManager.getTextProcessor(request.getTextProcessor());
         return processor.test(request.getAlg(), request.getModelID(), request.getInputFile(), request.getLanguage());
+    }
+
+    private void checkCustomModelPathShouldBeAddedToPipelineSpecification(PipelineSpecification specification) {
+        String customSentiment = specification.getProcessingStepAsString("customSentiment");
+        if (null != customSentiment && !customSentiment.equals("")) {
+            if (customModelPaths.containsKey(customSentiment)) {
+                specification.getCustomModelPaths().put("customSentiment", customModelPaths.get(customSentiment));
+            }
+        }
     }
 }

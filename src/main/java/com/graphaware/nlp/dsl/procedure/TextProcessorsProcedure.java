@@ -76,6 +76,7 @@ public class TextProcessorsProcedure extends AbstractDSL {
             Object result = getNLPManager().train(request);
             return Stream.of(new SingleResult(result));
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
