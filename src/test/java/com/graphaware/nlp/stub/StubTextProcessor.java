@@ -3,6 +3,7 @@ package com.graphaware.nlp.stub;
 import com.graphaware.nlp.annotation.NLPTextProcessor;
 import com.graphaware.nlp.domain.AnnotatedText;
 import com.graphaware.nlp.domain.Phrase;
+import com.graphaware.nlp.dsl.request.CustomModelsRequest;
 import com.graphaware.nlp.processor.AbstractTextProcessor;
 import com.graphaware.nlp.processor.PipelineInfo;
 import com.graphaware.nlp.domain.Sentence;
@@ -13,7 +14,7 @@ import com.graphaware.nlp.processor.TextProcessor;
 import java.util.*;
 
 @NLPTextProcessor(name = "StubTextProcessor")
-public class StubTextProcessor implements TextProcessor {
+public class StubTextProcessor extends AbstractTextProcessor {
 
     private String lastPipelineUsed = "";
 
@@ -163,6 +164,11 @@ public class StubTextProcessor implements TextProcessor {
 
     @Override
     public String train(String alg, String modelId, String file, String lang, Map<String, Object> params) {
+        return null;
+    }
+
+    @Override
+    public String train(CustomModelsRequest customModelsRequest) {
         return null;
     }
 

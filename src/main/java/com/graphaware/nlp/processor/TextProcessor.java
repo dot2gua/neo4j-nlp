@@ -17,6 +17,7 @@ package com.graphaware.nlp.processor;
 
 import com.graphaware.nlp.domain.AnnotatedText;
 import com.graphaware.nlp.domain.Tag;
+import com.graphaware.nlp.dsl.request.CustomModelsRequest;
 import com.graphaware.nlp.dsl.request.PipelineSpecification;
 
 import java.util.List;
@@ -57,6 +58,8 @@ public interface TextProcessor {
     void removePipeline(String pipeline);
 
     String train(String alg, String modelId, String file, String lang, Map<String, Object> params);
+
+    String train(CustomModelsRequest customModelsRequest);
 
     String test(String alg, String modelId, String file, String lang);
 

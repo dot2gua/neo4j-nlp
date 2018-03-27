@@ -15,20 +15,19 @@
  */
 package com.graphaware.nlp.processor;
 
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public abstract class AbstractTextProcessor implements TextProcessor{
+public abstract class AbstractTextProcessor implements TextProcessor {
 
     public static final String STEP_TOKENIZE = "tokenize";
     public static final String STEP_NER = "ner";
     public static final String STEP_PHRASE = "phrase";
     public static final String STEP_DEPENDENCY = "dependency";
     public static final String STEP_SENTIMENT = "sentiment";
+    public static final String STEP_IE = "ie";
 
     public static final String DEFAULT_STOP_WORD_LIST = "start,starts,period,periods,a,an,and,are,as,at,be,but,by,for,if,in,into,is,it,no,not,of,o,on,or,such,that,the,their,then,there,these,they,this,to,was,will,with";
     public static final String PUNCT_REGEX_PATTERN = "^([\\p{L}0-9]+)([-_' ][\\p{L}0-9]+)*$";

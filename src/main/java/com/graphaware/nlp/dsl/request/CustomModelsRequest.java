@@ -18,99 +18,70 @@ package com.graphaware.nlp.dsl.request;
 import org.neo4j.logging.Log;
 import com.graphaware.common.log.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-public class CustomModelsRequest {
+public class CustomModelsRequest extends AbstractProcedureRequest {
 
     private static final Log LOG = LoggerFactory.getLogger(TextRankRequest.class);
+    private final static String PARAMETER_TEXT_PROCESSOR = "textProcessor";
+    private final static String PARAMETER_ALG = "alg";
+    private final static String PARAMETER_MODEL_ID = "modelId";
+    private final static String PARAMETER_INPUT_FILE = "file";
+    private final static String PARAMETER_LANG = "lang";
+    private final static String PARAMETER_TRAINING_PARAMS = "trainingParameters";
+    private final static String PARAMETER_WORKDIR = "workdir";
+    private static final String DEFAULT_LANG = "en";
 
     private String textProcessor;
     private String alg;
     private String modelId;
     private String inputFile;
-    private String lang;
-
-    private Map<String, Object> trainingParams;
-
-    private final static String PARAMETER_TEXT_PROCESSOR = "textProcessor";
-    private final static String PARAMETER_ALG = "alg";
-    private final static String PARAMETER_MODEL_ID = "modelIdentifier";
-    private final static String PARAMETER_INPUT_FILE = "inputFile";
-    private final static String PARAMETER_LANG = "lang";
-    private final static String PARAMETER_TRAINING_PARAMS = "trainingParameters";
-
-    private static final String DEFAULT_LANG = "en";
+    private String language;
+    private String fs;
+    private Map<String, Object> trainingParameters = new HashMap<>();
 
     public static CustomModelsRequest fromMap(Map<String, Object> request) {
-        if (!request.containsKey(PARAMETER_TEXT_PROCESSOR))
-            throw new RuntimeException("Missing parameter " + PARAMETER_TEXT_PROCESSOR);
-        if (!request.containsKey(PARAMETER_ALG))
-            throw new RuntimeException("Missing parameter " + PARAMETER_ALG);
-        if (!request.containsKey(PARAMETER_MODEL_ID))
-            throw new RuntimeException("Missing parameter " + PARAMETER_MODEL_ID);
-        if (!request.containsKey(PARAMETER_INPUT_FILE))
-            throw new RuntimeException("Missing parameter " + PARAMETER_INPUT_FILE);
+        return mapper.convertValue(request, CustomModelsRequest.class);
+    }
 
-        CustomModelsRequest result = new CustomModelsRequest();
-        result.setTextProcessor((String) request.get(PARAMETER_TEXT_PROCESSOR));
-        result.setAlg((String) request.get(PARAMETER_ALG));
-        result.setModelID((String) request.get(PARAMETER_MODEL_ID));
-        result.setInputFile((String) request.get(PARAMETER_INPUT_FILE));
-        result.setLanguage((String) request.getOrDefault(PARAMETER_LANG, DEFAULT_LANG));
+    @Override
+    public List<String> validMapKeys() {
+        return Arrays.asList(PARAMETER_ALG, PARAMETER_INPUT_FILE, PARAMETER_LANG, PARAMETER_TEXT_PROCESSOR, PARAMETER_MODEL_ID, PARAMETER_TRAINING_PARAMS, PARAMETER_WORKDIR);
+    }
 
-        if (request.containsKey(PARAMETER_TRAINING_PARAMS)) {
-            result.setTrainingParameters((Map) request.get(PARAMETER_TRAINING_PARAMS));
-        }
-
-        return result;
+    @Override
+    public List<String> mandatoryKeys() {
+        return Arrays.asList(PARAMETER_WORKDIR, PARAMETER_MODEL_ID, PARAMETER_INPUT_FILE, PARAMETER_ALG, PARAMETER_TEXT_PROCESSOR);
     }
 
     public String getTextProcessor() {
-        return this.textProcessor;
-    }
-    
-    private void setTextProcessor(String processor) {
-        this.textProcessor = processor;
+        return textProcessor;
     }
 
     public String getAlg() {
-        return this.alg;
-    }
-
-    private void setAlg(String alg) {
-        this.alg = alg;
+        return alg;
     }
 
     public String getModelID() {
-        return this.modelId;
-    }
-
-    private void setModelID(String id) {
-        this.modelId = id;
+        return modelId;
     }
 
     public String getInputFile() {
-        return this.inputFile;
-    }
-
-    private void setInputFile(String file) {
-        this.inputFile = file;
+        return inputFile;
     }
 
     public String getLanguage() {
-        return this.lang;
+        return null == language ? DEFAULT_LANG : language;
     }
 
-    private void setLanguage(String lang) {
-        this.lang = lang;
+    public String getFs() {
+        return fs;
     }
 
     public Map<String, Object> getTrainingParameters() {
-        return this.trainingParams;
+        return trainingParameters;
     }
-
-    private void setTrainingParameters(Map<String, Object> params) {
-        this.trainingParams = params;
-    }
-
 }
