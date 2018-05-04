@@ -27,6 +27,7 @@ import com.graphaware.common.log.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import com.graphaware.nlp.vector.SparseVector;
 import java.util.concurrent.Executors;
@@ -59,7 +60,7 @@ public class VectorProcessLogic {
         return result;
     }
 
-    public int computeFeatureSimilarityForNodes(List<Node> nodes, String label, String propertyName, String similarityType, int kSize) {
+    public int computeFeatureSimilarityForNodes(List<Node> nodes, String label, String propertyName, String similarityType, int kSize, boolean is_sparse) {
         long startTime = System.currentTimeMillis();
         final AtomicInteger countProcessed = new AtomicInteger(0);
         final AtomicInteger countStored = new AtomicInteger(0);
@@ -78,7 +79,7 @@ public class VectorProcessLogic {
             if (nodeProcessed % 500 == 0) {
                 LOG.warn("Node Processed: " + nodeProcessed + " over " + totalNodeSize);
             }
-            computeFeatureSimilarityForNode(node, label, propertyName, similarityType, countProcessed, countStored, kSize);
+            computeFeatureSimilarityForNode(node, label, propertyName, similarityType, countProcessed, countStored, kSize, is_sparse);
         });
         long totalTime = System.currentTimeMillis() - startTime;
         LOG.warn("Total node processed: " + nodeAnalyzed.get() + " over " + totalNodeSize + " in " + totalTime);
@@ -86,7 +87,7 @@ public class VectorProcessLogic {
         return countProcessed.get();
     }
 
-    private void computeFeatureSimilarityForNode(Node node, String label, String propertyName, String similarityType, AtomicInteger countProcessed, AtomicInteger countStored, int kSize) {
+    private void computeFeatureSimilarityForNode(Node node, String label, String propertyName, String similarityType, AtomicInteger countProcessed, AtomicInteger countStored, int kSize, boolean is_sparse) {
         FixedSizeOrderedList<SimilarityItem> kNN = new FixedSizeOrderedList<>(kSize);
         try (Transaction tx0 = database.beginTx()) {
             ResourceIterator<Node> otherProperties = database.findNodes(Label.label(label));
@@ -97,7 +98,7 @@ public class VectorProcessLogic {
             secondNodes.stream()
                     .forEach((secondNode) -> {
                         if (secondNode.getId() != node.getId()) {
-                            float similarity = getSimilarity(getVector(node, propertyName), getVector(secondNode, propertyName));
+                            float similarity = getSimilarity(getVector(node, propertyName), getVector(secondNode, propertyName), is_sparse);
                             if (similarity > 0) {
                                 kNN.add(new SimilarityItem(node.getId(), secondNode.getId(), similarity, similarityType));
                                 countStored.incrementAndGet();
@@ -113,7 +114,14 @@ public class VectorProcessLogic {
         queueProcessor.offer(new SimilarityItemProcessEntry(node.getId(), kNN));
     }
 
-    public static float getSimilarity(List<Float> x, List<Float> y) {
+    public static float getSimilarity(List<Float> x, List<Float> y, boolean is_sparse) {
+        if (is_sparse)
+            return getSimilarityFromSparse(x, y);
+        else
+            return getSimilarityFromDense(x, y);
+    }
+
+    private static float getSimilarityFromSparse(List<Float> x, List<Float> y) {
         SparseVector xVector = SparseVector.fromList(x);
         SparseVector yVector = SparseVector.fromList(y);
         float a = xVector.dot(yVector);
@@ -123,5 +131,10 @@ public class VectorProcessLogic {
         } else {
             return 0f;
         }
+    }
+
+    private static float getSimilarityFromDense(List<Float> x, List<Float> y) {
+        CosineSimilarity simFunc = new CosineSimilarity();
+        return (float) simFunc.getSimilarity(x.stream().map(Float::doubleValue).collect(Collectors.toList()), y.stream().map(Float::doubleValue).collect(Collectors.toList()));
     }
 }

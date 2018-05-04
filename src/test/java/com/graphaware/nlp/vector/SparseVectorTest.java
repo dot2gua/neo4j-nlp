@@ -112,7 +112,7 @@ public class SparseVectorTest {
         SparseVector bV = SparseVector.fromList(b);
         float dot = aV.dot(bV);
         System.out.println("Dot: " + dot);
-        float similarity = VectorProcessLogic.getSimilarity(a, b);
+        float similarity = VectorProcessLogic.getSimilarity(a, b, true);
         System.out.println("similarity: " + similarity);
 
 //        assertEquals(13f, aV.dot(bV), 0.0f);

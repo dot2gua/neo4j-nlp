@@ -29,12 +29,13 @@ public class SimilarityRequest extends AbstractProcedureRequest {
     private final static String SIMILARITY_TYPE = "SIMILARITY_COSINE";
 
     private List<Node> input;
-    private Long depth;
+    //private Long depth;
     private String query;
     private String label;
     private String relationshipType;
     private String propertyName;
     private int kSize;
+    private Boolean is_sparse;
 
     public SimilarityRequest() {
     }
@@ -47,13 +48,13 @@ public class SimilarityRequest extends AbstractProcedureRequest {
         this.input = input;
     }
 
-    public Long getDepth() {
+    /*public Long getDepth() {
         return depth;
     }
 
     public void setDepth(Long depth) {
         this.depth = depth;
-    }
+    }*/
 
     public String getQuery() {
         return query;
@@ -86,6 +87,14 @@ public class SimilarityRequest extends AbstractProcedureRequest {
     public void setLabel(String label) {
         this.label = label;
     }
+
+    public Boolean isSparseVector() {
+        return this.is_sparse;
+    }
+
+    public void setIsSparse(Boolean b) {
+        this.is_sparse = b;
+    }
     
     @Override
     public List<String> validMapKeys() {
@@ -93,10 +102,11 @@ public class SimilarityRequest extends AbstractProcedureRequest {
                 INPUT_KEY,
                 QUERY_KEY,
                 PROPERTY_KEY,
-                DEPTH_KEY,
+                //DEPTH_KEY,
                 LABEL_KEY,
                 RELATIONSHIP_TYPE_KEY,
-                K_SIZE_KEY
+                K_SIZE_KEY,
+                IS_SPARSE_VECTOR_KEY
         );
     }
 
@@ -112,9 +122,12 @@ public class SimilarityRequest extends AbstractProcedureRequest {
         request.setInput((List) map.get(INPUT_KEY));
         request.setQuery((String) map.get(QUERY_KEY));
         request.setPropertyName((String) map.get(PROPERTY_KEY));
-        request.setDepth((Long) map.get(DEPTH_KEY));
+        //request.setDepth((Long) map.get(DEPTH_KEY));
         if (map.containsKey(RELATIONSHIP_TYPE_KEY)) {
             request.setRelationshipType((String) map.get(RELATIONSHIP_TYPE_KEY));
+            if (!map.containsKey(IS_SPARSE_VECTOR_KEY))
+                throw new RuntimeException("Please specify vector type via " + IS_SPARSE_VECTOR_KEY  + ": True or False");
+            request.setIsSparse((Boolean) map.get(IS_SPARSE_VECTOR_KEY));
         } else {
             request.setRelationshipType(SIMILARITY_TYPE);
         }

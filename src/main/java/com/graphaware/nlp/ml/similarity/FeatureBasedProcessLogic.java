@@ -193,7 +193,10 @@ public class FeatureBasedProcessLogic {
             if (nodeProcessed % 500 == 0) {
                 LOG.warn("Node Processed: " + nodeProcessed + " over " + totalNodeSize);
             }
-            computeFeatureSimilarityForNode(firstNode, query, similarityType, countProcessed, countStored, depth);
+            if (query == null || query.isEmpty())
+                computeFeatureSimilarityForNode(firstNode, DEFAULT_VECTOR_QUERY, similarityType, countProcessed, countStored, depth);
+            else
+                computeFeatureSimilarityForNode(firstNode, query, similarityType, countProcessed, countStored, depth);
         });
         tfCache.invalidateAll();
         long totalTime = System.currentTimeMillis() - startTime;

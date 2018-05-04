@@ -49,14 +49,15 @@ public class SimilarityProcessor extends AbstractExtension implements NLPExtensi
 
         int processed;
         if (request.getPropertyName() != null) {
-            processed = computeUsingProperty(request.getInput(), request.getLabel(), request.getPropertyName(), request.getRelationshipType(), request.getkSize());
+            processed = computeUsingProperty(request.getInput(), request.getLabel(), request.getPropertyName(), request.getRelationshipType(), request.getkSize(), request.isSparseVector());
         } else {
-            Long depth = request.getDepth();
+            /*Long depth = request.getDepth();
             if (depth != null && depth > 0) {
                 processed = computeAllCn5(request.getInput(), depth.intValue());
             } else {
                 processed = computeAll(request.getInput(), request.getQuery(), request.getRelationshipType());
-            }
+            }*/
+            processed = computeAll(request.getInput(), request.getQuery(), request.getRelationshipType());
         }
 
         return processed;
@@ -65,11 +66,12 @@ public class SimilarityProcessor extends AbstractExtension implements NLPExtensi
     public int computeAll(List<Node> input, String query, String relationshipType) {
         int processed = 0;
         List<Long> firstNodeIds = getNodesFromInput(input);
-        if (query != null && relationshipType != null) {
+        processed = featureBusinessLogic.computeFeatureSimilarityForNodes(firstNodeIds, query, relationshipType, 0);
+        /*if (query != null && relationshipType != null) {
             processed = featureBusinessLogic.computeFeatureSimilarityForNodes(firstNodeIds, query, relationshipType, 0);
         } else {
             processed = featureBusinessLogic.computeFeatureSimilarityForNodes(firstNodeIds);
-        }
+        }*/
         return processed;
 
     }
@@ -100,6 +102,7 @@ public class SimilarityProcessor extends AbstractExtension implements NLPExtensi
         }
     }
 
+    @Deprecated
     public int computeAllCn5(List<Node> input, int depth) {
         int processed = 0;
         List<Long> firstNodeIds = getNodesFromInput(input);
@@ -107,9 +110,9 @@ public class SimilarityProcessor extends AbstractExtension implements NLPExtensi
         return processed;
     }
 
-    private int computeUsingProperty(List<Node> input, String label, String propertyName, String relationshipType, int kSize) {
+    private int computeUsingProperty(List<Node> input, String label, String propertyName, String relationshipType, int kSize, Boolean is_sparse) {
         int processed = 0;
-        processed = vectorBusinessLogic.computeFeatureSimilarityForNodes(input, label, propertyName, relationshipType, kSize);
+        processed = vectorBusinessLogic.computeFeatureSimilarityForNodes(input, label, propertyName, relationshipType, kSize, is_sparse);
         return processed;
     }
 }
