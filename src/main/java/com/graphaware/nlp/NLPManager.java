@@ -93,7 +93,9 @@ public final class NLPManager {
         return NLPManager.instance;
     }
 
-    public void init(GraphDatabaseService database, NLPConfiguration nlpConfiguration, DynamicConfiguration configuration) {
+    public void init(GraphDatabaseService database,
+                     NLPConfiguration nlpConfiguration,
+                     DynamicConfiguration configuration) {
         if (initialized) {
             return;
         }
@@ -125,11 +127,20 @@ public final class NLPManager {
     }
 
     public Node annotateTextAndPersist(AnnotationRequest annotationRequest) {
-        return annotateTextAndPersist(annotationRequest.getText(), annotationRequest.getId(), annotationRequest.getTextProcessor(),
-                annotationRequest.getPipeline(), annotationRequest.isForce(), annotationRequest.shouldCheckLanguage());
+        return annotateTextAndPersist(annotationRequest.getText(),
+                                      annotationRequest.getId(),
+                                      annotationRequest.getTextProcessor(),
+                                      annotationRequest.getPipeline(),
+                                      annotationRequest.isForce(),
+                                      annotationRequest.shouldCheckLanguage());
     }
 
-    public Node annotateTextAndPersist(String text, String id, String textProcessor, String pipelineName, boolean force, boolean checkForLanguage) {
+    public Node annotateTextAndPersist(String text,
+                                       String id,
+                                       String textProcessor,
+                                       String pipelineName,
+                                       boolean force,
+                                       boolean checkForLanguage) {
         String lang = checkTextLanguage(text, checkForLanguage);
         PipelineSpecification pipelineSpecification = getPipelineSpecification(pipelineName);
         AnnotatedText at = annotate(text, lang, pipelineSpecification);
@@ -142,7 +153,9 @@ public final class NLPManager {
         return pipelineSpecification;
     }
 
-    public AnnotatedText annotate(String text, String lang, PipelineSpecification pipelineSpecification) {
+    public AnnotatedText annotate(String text,
+                                  String lang,
+                                  PipelineSpecification pipelineSpecification) {
         if (null == pipelineSpecification) {
             throw new RuntimeException("No pipeline " + pipelineSpecification.name + " found.");
         }
@@ -153,7 +166,10 @@ public final class NLPManager {
         return at;
     }
 
-    public Node annotateTextAndPersist(String text, String id, boolean checkForLanguage, PipelineSpecification pipelineSpecification) {
+    public Node annotateTextAndPersist(String text,
+                                       String id,
+                                       boolean checkForLanguage,
+                                       PipelineSpecification pipelineSpecification) {
         String lang = checkTextLanguage(text, checkForLanguage);
         TextProcessor processor = textProcessorsManager.getTextProcessor(pipelineSpecification.getTextProcessor());
         AnnotatedText annotatedText = processor.annotateText(text, lang, pipelineSpecification);
@@ -161,19 +177,30 @@ public final class NLPManager {
         return processAnnotationPersist(id, text, annotatedText, pipelineSpecification);
     }
 
-    public Node processAnnotationPersist(String id, String text, AnnotatedText annotatedText, PipelineSpecification pipelineSpecification) {
+    public Node processAnnotationPersist(String id,
+                                         String text,
+                                         AnnotatedText annotatedText,
+                                         PipelineSpecification pipelineSpecification) {
         String txId = String.valueOf(System.currentTimeMillis());
-        TextAnnotationEvent preStorageEvent = new TextAnnotationEvent(annotatedText, txId, pipelineSpecification);
+        TextAnnotationEvent preStorageEvent = new TextAnnotationEvent(annotatedText,
+                                                                      txId,
+                                                                      pipelineSpecification);
         eventDispatcher.notify(NLPEvents.PRE_ANNOTATION_STORAGE, preStorageEvent);
         Node annotatedNode = persistAnnotatedText(annotatedText, id, txId);
-        TextAnnotationEvent event = new TextAnnotationEvent(annotatedNode, annotatedText, id, txId, pipelineSpecification);
+        TextAnnotationEvent event = new TextAnnotationEvent(annotatedNode,
+                                                            annotatedText,
+                                                            id,
+                                                            txId,
+                                                            pipelineSpecification);
         annotatedText.setText(text);
         eventDispatcher.notify(NLPEvents.POST_TEXT_ANNOTATION, event);
 
         return annotatedNode;
     }
 
-    public Node persistAnnotatedText(AnnotatedText annotatedText, String id, String txId) {
+    public Node persistAnnotatedText(AnnotatedText annotatedText,
+                                     String id,
+                                     String txId) {
         return getPersister(annotatedText.getClass()).persist(annotatedText, id, txId);
     }
 
@@ -202,7 +229,8 @@ public final class NLPManager {
         return new ArrayList<>();
     }
 
-    public void removePipeline(String pipeline, String processor) {
+    public void removePipeline(String pipeline,
+                               String processor) {
         configuration.removePipeline(pipeline, processor);
         textProcessorsManager.getTextProcessor(processor).removePipeline(pipeline);
     }
@@ -219,25 +247,27 @@ public final class NLPManager {
         return annotatedText.filter(filter);
     }
 
-    public void applySentiment(Node node, String textProcessor) {
+    public void applySentiment(Node node,
+                               String textProcessor) {
         TextProcessor processor = textProcessor.equals("")
                 ? getTextProcessorsManager().getDefaultProcessor()
                 : getTextProcessorsManager().getTextProcessor(textProcessor);
 
         AnnotatedText annotatedText = (AnnotatedText) getPersister(AnnotatedText.class).fromNode(node);
         processor.sentiment(annotatedText);
-        getPersister(AnnotatedText.class).persist(
-                annotatedText,
-                node.getProperty(configuration.getPropertyKeyFor(Properties.PROPERTY_ID)).toString(),
-                String.valueOf(System.currentTimeMillis())
-        );
+        getPersister(AnnotatedText.class).persist(annotatedText,
+                                                  node.getProperty(configuration.getPropertyKeyFor(Properties.PROPERTY_ID))
+                                                      .toString(),
+                                                  String.valueOf(System.currentTimeMillis()));
     }
 
-    public String checkTextLanguage(String text, boolean failIfUnsupported) {
+    public String checkTextLanguage(String text,
+                                    boolean failIfUnsupported) {
         LanguageManager languageManager = LanguageManager.getInstance();
         String detectedLanguage = languageManager.detectLanguage(text);
 
-        if (!languageManager.isTextLanguageSupported(text) && configuration.hasSettingValue(SettingsConstants.FALLBACK_LANGUAGE)) {
+        if (!languageManager.isTextLanguageSupported(text)
+                && configuration.hasSettingValue(SettingsConstants.FALLBACK_LANGUAGE)) {
             return configuration.getSettingValueFor(SettingsConstants.FALLBACK_LANGUAGE).toString();
         }
 
@@ -262,12 +292,15 @@ public final class NLPManager {
 
     public void addPipeline(PipelineSpecification request) {
         // Check that the textProcessor exist !
-        if (null == request.getTextProcessor() || textProcessorsManager.getTextProcessor(request.getTextProcessor()) == null) {
-            throw new RuntimeException(String.format("Invalid text processor %s", request.getTextProcessor()));
+        if (null == request.getTextProcessor()
+                || textProcessorsManager.getTextProcessor(request.getTextProcessor()) == null) {
+            throw new RuntimeException(String.format("Invalid text processor %s",
+                                                     request.getTextProcessor()));
         }
         PipelineSpecification pipelineSpecification = configuration.loadPipeline(request.getName());
         if (null != pipelineSpecification) {
-            throw new RuntimeException("Pipeline with name " + request.getName() + " already exist");
+            throw new RuntimeException("Pipeline with name " + request.getName()
+                    + " already exist");
         }
         configuration.storeCustomPipeline(request);
         textProcessorsManager.createPipeline(request);
@@ -275,11 +308,11 @@ public final class NLPManager {
 
     public void addWord2VecModel(Word2VecModelSpecification request) {
         Word2VecProcessor word2VecProcessor = (Word2VecProcessor) getExtension(Word2VecProcessor.class);
-        word2VecProcessor.getWord2VecModel().createModelFromPaths(
-                request.getSourcePath(),
-                request.getDestinationPath(),
-                request.getModelName(),
-                request.getLanguage());
+        word2VecProcessor.getWord2VecModel()
+                         .createModelFromPaths(request.getSourcePath(),
+                                               request.getDestinationPath(),
+                                               request.getModelName(),
+                                               request.getLanguage());
         configuration.storeWord2VecModel(request);
     }
 
@@ -288,19 +321,19 @@ public final class NLPManager {
         configuration.loadWord2VecModel().forEach(word2VecModelSpecification -> {
             try {
                 Word2VecProcessor word2VecProcessor = (Word2VecProcessor) getExtension(Word2VecProcessor.class);
-                word2VecProcessor.getWord2VecModel().createModelFromPaths(
-                        word2VecModelSpecification.getSourcePath(),
-                        word2VecModelSpecification.getDestinationPath(),
-                        word2VecModelSpecification.getModelName(),
-                        word2VecModelSpecification.getLanguage());
+                word2VecProcessor.getWord2VecModel()
+                                 .createModelFromPaths(word2VecModelSpecification.getSourcePath(),
+                                                       word2VecModelSpecification.getDestinationPath(),
+                                                       word2VecModelSpecification.getModelName(),
+                                                       word2VecModelSpecification.getLanguage());
             } catch (Exception ex) {
-                LOG.error("Error while loading the model: " + word2VecModelSpecification.getModelName(), ex);
+                LOG.error("Error while loading the model: "
+                        + word2VecModelSpecification.getModelName(), ex);
                 configuration.removeWord2VecModel(word2VecModelSpecification.getModelName());
             }
         });
 
     }
-
 
     public Enricher getEnricher(String name) {
         return enrichmentRegistry.resolve(name);
@@ -308,8 +341,12 @@ public final class NLPManager {
 
     private EnrichmentRegistry buildAndRegisterEnrichers() {
         EnrichmentRegistry registry = new EnrichmentRegistry();
-        registry.register(new ConceptNet5Enricher(database, persistenceRegistry, textProcessorsManager));
-        registry.register(new MicrosoftConceptEnricher(database, persistenceRegistry, textProcessorsManager));
+        registry.register(new ConceptNet5Enricher(database,
+                                                  persistenceRegistry,
+                                                  textProcessorsManager));
+        registry.register(new MicrosoftConceptEnricher(database,
+                                                       persistenceRegistry,
+                                                       textProcessorsManager));
 
         return registry;
     }
@@ -349,12 +386,15 @@ public final class NLPManager {
         try {
             VectorComputation vectorComputation = vectorComputationProcesses.get(request.getType());
             if (vectorComputation == null) {
-                throw new RuntimeException("Cannot find the VectorComputation instance with type: " + request.getType());
+                throw new RuntimeException("Cannot find the VectorComputation instance with type: "
+                        + request.getType());
             }
-            VectorHandler vector
-                    = vectorComputation.computeSparseVector(request.getInput().getId(), request.getParameters());
+            VectorHandler vector = vectorComputation.computeSparseVector(request.getInput().getId(),
+                                                                         request.getParameters());
             if (vector != null) {
-                VectorContainer vectorNode = new VectorContainer(request.getInput().getId(), request.getPropertyName(), vector);
+                VectorContainer vectorNode = new VectorContainer(request.getInput().getId(),
+                                                                 request.getPropertyName(),
+                                                                 vector);
                 getPersister(vectorNode.getClass()).persist(vectorNode, request.getLabel(), null);
             }
             return request.getInput();
@@ -367,23 +407,32 @@ public final class NLPManager {
     public void computeVectorTrainAndPersist(ComputeVectorTrainRequest request) {
         VectorComputation vectorComputation = vectorComputationProcesses.get(request.getType());
         if (vectorComputation == null) {
-            throw new RuntimeException("Cannot find the VectorComputation instance with type: " + request.getType());
+            throw new RuntimeException("Cannot find the VectorComputation instance with type: "
+                    + request.getType());
         }
         vectorComputation.train(request.getParameters());
     }
 
     public String train(CustomModelsRequest request) {
         TextProcessor processor = textProcessorsManager.getTextProcessor(request.getTextProcessor());
-        return processor.train(request.getAlg(), request.getModelID(), request.getInputFile(), request.getLanguage(), request.getTrainingParameters());
+        return processor.train(request.getAlg(),
+                               request.getModelID(),
+                               request.getInputFile(),
+                               request.getLanguage(),
+                               request.getTrainingParameters());
     }
 
     public String test(CustomModelsRequest request) {
         TextProcessor processor = textProcessorsManager.getTextProcessor(request.getTextProcessor());
-        return processor.test(request.getAlg(), request.getModelID(), request.getInputFile(), request.getLanguage());
+        return processor.test(request.getAlg(),
+                              request.getModelID(),
+                              request.getInputFile(),
+                              request.getLanguage());
     }
 
     public String getDefaultModelWorkdir() {
-        String p = configuration.getSettingValueFor(SettingsConstants.DEFAULT_MODEL_WORKDIR).toString();
+        String p = configuration.getSettingValueFor(SettingsConstants.DEFAULT_MODEL_WORKDIR)
+                                .toString();
         if (p.equals(SettingsConstants.DEFAULT_MODEL_WORKDIR)) {
             throw new RuntimeException("No default model wordking directory set in configuration");
         }
@@ -392,7 +441,8 @@ public final class NLPManager {
     }
 
     public boolean hasDefaultModelWorkdir() {
-        String p = configuration.getSettingValueFor(SettingsConstants.DEFAULT_MODEL_WORKDIR).toString();
+        String p = configuration.getSettingValueFor(SettingsConstants.DEFAULT_MODEL_WORKDIR)
+                                .toString();
 
         return !p.equals(SettingsConstants.DEFAULT_MODEL_WORKDIR);
     }
@@ -416,10 +466,12 @@ public final class NLPManager {
     private void registerPipelinesFromConfig() {
         configuration.loadCustomPipelines().forEach(pipelineSpecification -> {
             // Check that the text processor exist, it can happen that the configuration
-            // hold a reference to a processor that is not more registered, in order to avoid
+            // hold a reference to a processor that is not more registered, in order to
+            // avoid
             // this method to fail completely for valid pipelines, we just do not register
             // possible legacy pipelines
-            if (textProcessorsManager.getTextProcessorNames().contains(pipelineSpecification.getTextProcessor())) {
+            if (textProcessorsManager.getTextProcessorNames()
+                                     .contains(pipelineSpecification.getTextProcessor())) {
                 textProcessorsManager.createPipeline(pipelineSpecification);
             }
         });

@@ -46,7 +46,7 @@ public class LanguageManager {
     private boolean initialized = false;
     private LanguageDetector languageDetector;
     private TextObjectFactory textObjectFactory;
-    
+
     private final Set<String> supportedLanguages = new TreeSet<>();
 
     private LanguageManager() {
@@ -61,11 +61,11 @@ public class LanguageManager {
         LOG.info("Initializing Language Detector ...");
         try {
             List<LanguageProfile> languageProfiles = new LanguageProfileReader().readAllBuiltIn();
-            //build language detector:
+            // build language detector:
             languageDetector = LanguageDetectorBuilder.create(NgramExtractors.standard())
-                    .withProfiles(languageProfiles)
-                    .build();
-            //create a text object factory
+                                                      .withProfiles(languageProfiles)
+                                                      .build();
+            // create a text object factory
             textObjectFactory = CommonTextObjectFactories.forDetectingOnLargeText();
             initialized = true;
         } catch (IOException ex) {
@@ -97,17 +97,17 @@ public class LanguageManager {
 
         return LANGUAGE_NA;
     }
-    
+
     public boolean isTextLanguageSupported(String text) {
         return supportedLanguages.contains(detectLanguage(text));
     }
-    
+
     public boolean isLanguageSupported(String language) {
         return supportedLanguages.contains(language);
     }
-    
+
     public void addSupportedLanguage(String language) {
-        supportedLanguages.add(language);        
+        supportedLanguages.add(language);
     }
 
 }

@@ -6,3 +6,6 @@ dependency-reduced-pom.xml
 .idea
 .DS_Store
 metrics/
+.classpath
+.project
+.settings
